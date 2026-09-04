@@ -3,64 +3,86 @@
 -- Queston 1:  Find the total number of orders fulfilled by each seller state?
 
 SELECT 
-    s.seller_state, COUNT(distinct(o.order_id)) as Total_Orders
+    s.seller_state, COUNT(DISTINCT (o.order_id)) AS Total_Orders
 FROM
     sellers AS s
         JOIN
     order_items o USING (seller_id)
 GROUP BY s.seller_state
-order by Total_Orders desc;
+ORDER BY Total_Orders DESC;
 
 
 -- Question 2: For each product category, calculate the cumulative revenue generated as orders come in over time.
 
 SELECT DISTINCT
     product_category_name_translation.product_category_name_english,
-    SUM(order_items.price + order_items.freight_value) as revenue
+    SUM(order_items.price + order_items.freight_value) AS revenue
 FROM
-	product_category_name_translation
-    join
-    products
-    using(product_category_name)
+    product_category_name_translation
+        JOIN
+    products USING (product_category_name)
         JOIN
     order_items USING (product_id)
 GROUP BY product_category_name_translation.product_category_name_english
-order by revenue desc;
+ORDER BY revenue DESC;
 
 
 -- Question 3: Which payment method do customers use the most, and what is the average order value for each payment type? 
 
-select payment_type, count(distinct order_id) as Total_transactions, avg(payment_value) as average_order_value
-from order_payments
-group by payment_type
-order by Total_transactions desc; 
+SELECT 
+    payment_type,
+    COUNT(DISTINCT order_id) AS Total_transactions,
+    AVG(payment_value) AS average_order_value
+FROM
+    order_payments
+GROUP BY payment_type
+ORDER BY Total_transactions DESC; 
 
 
 -- Question 4: Find the customer who has spent the most money across all their orders
 
-select distinct orders.customer_id, order_payments.order_id, sum(order_payments.payment_value) as Total_value
-from orders join order_payments using(order_id)
-group by orders.customer_id, order_payments.order_id
-order by Total_value desc
-limit 1;
+SELECT DISTINCT
+    orders.customer_id,
+    order_payments.order_id,
+    SUM(order_payments.payment_value) AS Total_value
+FROM
+    orders
+        JOIN
+    order_payments USING (order_id)
+GROUP BY orders.customer_id , order_payments.order_id
+ORDER BY Total_value DESC
+LIMIT 1;
 
 
 -- Question 5: Find the average review score for each product category. 
 
-select product_category_name_translation.product_category_name_english, avg(order_reviews.review_score) as Average_Review_Score
-from product_category_name_translation join products using(product_category_name)
-join order_items using(product_id)
-join order_reviews using (order_id)
-group by product_category_name_translation.product_category_name_english
-order by Average_Review_Score desc;
+SELECT 
+    product_category_name_translation.product_category_name_english,
+    AVG(order_reviews.review_score) AS Average_Review_Score
+FROM
+    product_category_name_translation
+        JOIN
+    products USING (product_category_name)
+        JOIN
+    order_items USING (product_id)
+        JOIN
+    order_reviews USING (order_id)
+GROUP BY product_category_name_translation.product_category_name_english
+ORDER BY Average_Review_Score DESC;
 
 
 -- Question 6: Find the total number of orders placed by each customer, broken down by the state they live in. 
 
-select c.customer_unique_id, c.customer_state, count(distinct o.order_id) as total_orders
-from customers c join orders o using(customer_id)
-group by c.customer_unique_id, c.customer_state
-order by c.customer_state, total_orders desc;
+SELECT 
+    c.customer_unique_id,
+    c.customer_state,
+    COUNT(DISTINCT o.order_id) AS total_orders
+FROM
+    customers c
+        JOIN
+    orders o USING (customer_id)
+GROUP BY c.customer_unique_id , c.customer_state
+ORDER BY c.customer_state , total_orders DESC;
 
 
 -- Question 7: Identify sellers who registered on the platform but have never fulfilled a single order. 
@@ -77,12 +99,18 @@ WHERE
     
 -- Question 8: Find the top 5 product categories by total revenue
 
-select pt.product_category_name_english as Product_Categories, sum(o.price + o.freight_value) as Total_Revenue from products p join product_category_name_translation pt
-using(product_category_name)
-join order_items o using(product_id)
-group by Product_Categories
-order by Total_Revenue desc
-Limit 5; 
+SELECT 
+    pt.product_category_name_english AS Product_Categories,
+    SUM(o.price + o.freight_value) AS Total_Revenue
+FROM
+    products p
+        JOIN
+    product_category_name_translation pt USING (product_category_name)
+        JOIN
+    order_items o USING (product_id)
+GROUP BY Product_Categories
+ORDER BY Total_Revenue DESC
+LIMIT 5; 
 
 
 -- Question 9: Find the median delivery time (in days) between order placement and actual delivery. 
@@ -102,10 +130,75 @@ WHERE row_num IN (FLOOR((total_rows + 1) / 2), FLOOR((total_rows + 2) / 2));
 
 -- Question 10: Find all products that have never been ordered
 
-select p.product_id, p.product_category_name from products p 
-left join order_items o
-using (product_id)
-where o.product_id is null;
+SELECT 
+    p.product_id, p.product_category_name
+FROM
+    products p
+        LEFT JOIN
+    order_items o USING (product_id)
+WHERE
+    o.product_id IS NULL;
+
+
+-- Question 11: Find sellers who have fulfilled more orders than the average seller on the platform
+
+SELECT 
+    seller_id AS sellers, COUNT(order_id) AS Total_Orders
+FROM
+    order_items
+GROUP BY sellers
+HAVING COUNT(order_id) > (SELECT 
+        AVG(cnt)
+    FROM
+        (SELECT 
+            seller_id, COUNT(order_id) AS cnt
+        FROM
+            order_items
+        GROUP BY seller_id) AS a);
+        
+        
+-- Question 12: Find which Brazilian states have the highest average customer review score for orders delivered there
+
+SELECT 
+    c.customer_state AS states,
+    AVG(r.review_score) AS Average_Review_Score
+FROM
+    order_reviews r
+        JOIN
+    orders o USING (order_id)
+        JOIN
+    customers c USING (customer_id)
+WHERE
+    o.order_status = 'delivered'
+GROUP BY states
+ORDER BY Average_Review_Score DESC;
+
+
+-- Question 13: Identify customers who have placed orders but never left a review
+
+SELECT 
+    COUNT(DISTINCT customer_id) AS NoReview_Customers
+FROM
+    orders 
+        LEFT JOIN
+    order_reviews  using(order_id)
+WHERE
+    order_reviews.review_id IS NULL;
+
+
+-- Question 14: Find the month with the highest number of orders placed across the entire platform
+
+SELECT 
+    DATE_FORMAT(order_purchase_timestamp, '%Y-%m') AS order_month,
+    COUNT(*) AS total_orders
+FROM
+    orders
+GROUP BY DATE_FORMAT(order_purchase_timestamp, '%Y-%m')
+ORDER BY total_orders DESC
+LIMIT 1;
+
+
+
 
 
  
